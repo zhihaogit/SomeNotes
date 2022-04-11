@@ -1,18 +1,20 @@
 # MongoDB
 
-## 简介
+## 基础
+
+### 简介
 
 - MongoDB是为快速开发互联网 web应用而设计的数据库系统
 - MongoDB的设计目的是极简、灵活、作为 web应用栈的一部分
 - MongoDB的数据模型是面向文档的，所谓文档是一种类似于 JSON的结构，简单理解 MongoDB这个数据库中存的是各种JSON。(BSON)
 
-## 三个概念
+### 三个概念
 
 - 数据库（database）是一个仓库，在仓库中可以存放集合。不需要手动创建，切换即创建
 - 集合（Collection）集合类似于数组，在集合中可以存放文档。不需要手动创建，切换即创建
 - 文档（Document）是数据库中的最小单位，我们存储和操作的内容都是文档
 
-## 基本指令
+### 基本指令
 
 ```sql
 show dbs  --  显示当前的所有数据库
@@ -23,9 +25,9 @@ db -- 显示当前的数据库名称
 show collections -- 显示数据库中所有的集合  
 ```
 
-## CRUD操作
+### CRUD操作
 
-### 新增
+#### 新增
 
 ```sql
 -- 向集合中插入一个或多个文档
@@ -51,7 +53,7 @@ db.stus.insertMany([
 ]);
 ```
 
-### 查询
+#### 查询
 
 ```sql
 -- 查询当前集合中所有的文档
@@ -108,9 +110,14 @@ db.numbers.find({num: {$lte: 10}});  -- 小于等于 10
 
 -- 分页查询，前11 - 20之间的数据
 db.numbers.find({}).skip(10).limit(10);
+
+-- 查询工资小于 2000的员工
+db.emp.find({sal: {$lt: 2000}});
+-- 查询工资小于 1000或大于 2500的员工
+db.emp.find({$or: [{sal: {$lt: 1000}}, {sal: {$gt: 2500}}]});
 ```
 
-### 修改
+#### 修改
 
 ```sql
 -- 修改匹配到的数据
@@ -121,6 +128,7 @@ db.<collection>.update(查询条件, 新对象 [, 标识符]);
    -- $unset 可以用来删除文档中的指定属性
    -- $push 向数组中添加一个新元素
    -- $addToSet 向数组中添加一个新元素，不重复添加
+   -- $inc 在原始数据中自增指定大小
 -- 标识符，{multi: true}同时修改所有符合条件的文档
 
 -- 同时修改多个符合条件的文档
@@ -172,9 +180,12 @@ db.users.update(
     }
   }
 )
+
+-- 为所有薪资低于1000的员工增加工资400块
+db.emp.updateMany({sal: {$lte: 1000}}, {$inc: {sal: 400}});
 ```
 
-### 删除
+#### 删除
 
 ```sql
 -- 删除数据，默认删除所有符合条件的数据
@@ -205,3 +216,114 @@ db.stus.remove(
 );
 ```
 
+### 文档之间的关系
+
+#### 一对一（one to one）
+
+例如：夫妻
+
+在 mongoDB，可以通过**内嵌文档**的形式来体现出一对一的关系
+
+```sql
+db.wifeAndHusband.insert([
+  {
+    name: "wife1",
+    husband: {
+      name: "husband1"
+    }
+  },
+  {
+    name: "wife2",
+    husband: {
+      name: "husband2"
+    }
+  }
+])
+```
+
+#### 一对多（one to many）|多对一（many to one）
+
+例如：父母 对 孩子，用户 对 订单，文章 对 评论
+
+- 可以通过**内嵌文档**的形式来实现
+
+- 可以使用类似于**外键**的形式
+
+  ```sql
+  db.users.insert([
+    {name: "swk", _id: "swk"},
+    {name: "zbj", _id: "zbj"}
+  ]);
+  
+  db.orders.insert([
+    {
+    	list: ["waterlemon", "orange", "blueberry"],
+    	user_id: "swk"
+    },
+    {
+    	list: ["apple", "mango", "strawberry"],
+    	user_id: "zbj"
+    }
+  ]);
+  
+  var userId = db.users.findOne({ name: "swj" })._id;
+  db.orders.find({user_id: userId});
+  ```
+
+#### 多对多（many to many）
+
+例如：分类 对 商品，老师 对 学生
+
+```sql
+db.teachers.insert([
+  {name: "hqg", _id: "hqg"},
+  {name: "hys", _id: "hys"},
+  {name: "ptlz", _id: "ptlz"}
+]);
+
+db.students.insert([
+  {name: "gj", teacher_ids: [ "hqg", "hys" ]},
+  {name: "swk", teacher_ids: [ "hqg", "hys", "ptlz" ]}
+]);
+
+db.teachers.find();
+db.students.find();
+```
+
+### Sort
+
+- 查询文档时，默认情况是按照 `_id`的值进行升序排列
+- `sort()`可以用来指定文档的排序规则，需要一个对象形式的参数，`1`表示升序，`-1`表示降序
+- `limit()`,`skip()`,`sort()`可以按任意的顺序进行调用
+
+```sql
+db.emp.find({}).sort({sal: 1, empno: -1});
+```
+
+### 投影
+
+在查询时，可以在第二个参数的位置设置查询结果的投影，在查询结果中显示或隐藏相应列
+
+```sql
+-- 1 显示该字段，0 隐藏该字段
+db.emp.find({}, {ename: 1, _id: 0, sal: 1});
+```
+
+### mongoose
+
+> nodejs操作 mongo的 ODM（对象文档模型）库
+
+#### 优势
+
+- 可以为文档创建一个模式结构（Schema）
+  - Schema对象定义约束了数据库中的文档结构
+- 数据可以通过类型转换转换为对象模型（Model）
+  - Model对象作为集合中的所有文档的表示，相当于MongoDB数据库中的集合 Collection
+- 可以对模型中的对象/文档（Document）进行验证
+  - Document表示集合中的具体文档，相当于集合中的一个具体文档
+- 可以使用中间件来应用业务逻辑挂钩
+- 比 node原生的 mongodb驱动更容易
+
+### spring-boot-starter-data-mongodb
+
+> spring项目使用的 mongodb操作包

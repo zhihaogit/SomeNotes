@@ -852,4 +852,4 @@ io-threads 4
 - RESP3新的 Redis通信协议：优化服务端与客户端之间的通信
 - Client side caching客户端缓存：基于 RESP3协议实现的客户端缓存功能。为了进一步提升缓存的性能，将客户端经常访问的数据 cache到客户端。减少 TCP网络交互
 - Proxy集群代理模式：Proxy功能，让 Cluster拥有像单实例一样的接入方式，降低大家使用 cluster的门槛，不过需要注意的事代理不改变 Cluster的功能限制，不支持的命令还是不会支持，比如跨 slot的多 key操作
-- Modules API：Redis6中模块 API开发进展非常大，因为 Redis Labs为了开发复杂的功能，从一开始就用上了 Redis模块。Redis可以变成一个框架，利用 Modules来构建不同系统，而不需要从头开始写，并且还需要 BSD许可。Redis一开始就是一个向编写各种系统开发的平台
+- Modules API：Redis6中模块 API开发进展非常大，因为 Redis Labs为了开发复杂的功能，从一开始就用上了 Redis模块。Redis可以变成一个框架，利用 Modules来构建不同系统，而不需要从头开始写，并且还需要 BSD许可。Redis一开始就是一个向编写各种系统开发的平台f
