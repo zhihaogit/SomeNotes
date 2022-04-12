@@ -174,7 +174,7 @@ springboot程序启动时，会从以下位置加载配置文件：
 
 SpringBoot的 web环境中默认使用 tomcat作为内置服务器，其实 SpringBoot提供了 4个内置服务器供我们选择，我们可以很方便的进行切换
 
-![内置服务器](http://119.3.210.172:8080/api/view/6439b9537ff9f336095f4998c25780a58dc66415a30b685f4a759e5ce738930b)
+![内置服务器](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/6439b9537ff9f336095f4998c25780a58dc66415a30b685f4a759e5ce738930b.png)
 
 ##### 配置
 
@@ -278,7 +278,7 @@ SpringBoot在项目启动时，会对几个监听器进行回调，我们可以�
 
 ### SpringBoot启动流程分析
 
-![启动流程图](http://119.3.210.172:8080/api/view/78ad7cb5a32fea2296b59bc4e14e9fde223a21c46cf2613861d149d06b7ce727)
+![启动流程图](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/78ad7cb5a32fea2296b59bc4e14e9fde223a21c46cf2613861d149d06b7ce727.png)
 
 ## SpringBoot监控
 

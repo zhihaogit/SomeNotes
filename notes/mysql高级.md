@@ -119,7 +119,7 @@ BTREE又叫多路平衡搜索树，一棵 m叉的 BTREE特性如下：
 - 所有的叶子节点都在同一层
 - 每个非叶子节点由 n个 key与 n + 1个指针组成，其中 `ceil(m / 2) - 1<= n <= n -1`
 
-![BTREE](http://119.3.210.172:8080/api/view/8e8d8a90ec4b92bdedfea267735f292f34a30b9e25995a3f84d225552665ab6e)
+![BTREE](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/8e8d8a90ec4b92bdedfea267735f292f34a30b9e25995a3f84d225552665ab6e.png)
 
 BTREE树与二叉树相比，查询效率更高。因为对于相同的数据量来说，BTREE的层级结构比二叉树小，因此搜索速度快。
 
@@ -131,7 +131,7 @@ B+TREE是 BTREE的变种，其区别如下：
 - B+TREE的叶子节点包含所有的 key信息，依 key大小顺序排列
 - 所有的非叶子节点都可以看作是 key的索引部分
 
-![B+TREE](http://119.3.210.172:8080/api/view/56aa4e5f50a0f6a4cbc386545fa05d1983d1a72ce6c0827332502a2c8d973f35)
+![B+TREE](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/56aa4e5f50a0f6a4cbc386545fa05d1983d1a72ce6c0827332502a2c8d973f35.png)
 
 由于B+TREE只有叶子节点保存 key信息，查询任何 key都要从 root走到叶子。所以 B+TREE的查询效率更加稳定
 
@@ -139,7 +139,7 @@ B+TREE是 BTREE的变种，其区别如下：
 
 mysql索引数据结构对经典的 B+TREE进行了优化。在原 B+TREE的基础上，增加一个指向相邻叶子节点的链表指针，就形成了带有顺序指针的 B+TREE，提高了区间（范围）访问的性能。
 
-![mysql_B+TREE](http://119.3.210.172:8080/api/view/6662230a5c89103a937949a386128c2bb125541555c70e67dcce5e9ca48242b9)
+![mysql_B+TREE](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/6662230a5c89103a937949a386128c2bb125541555c70e67dcce5e9ca48242b9.png)
 
 ### 索引分类
 
@@ -782,7 +782,7 @@ show triggers;
 
 ## Mysql的体系结构
 
-![体系结构](http://119.3.210.172:8080/api/view/71e20eb10f6c31dbf57e0fdc55ac43eedad032d5d97b38c8e1b2770f051582cf)
+![体系结构](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/71e20eb10f6c31dbf57e0fdc55ac43eedad032d5d97b38c8e1b2770f051582cf.png)
 
 ### 组成部分
 
@@ -1496,7 +1496,7 @@ explain select * from tb_seller force index(idx_seller_name) where name '小米�
 
 ### 操作流程
 
-![操作流程](http://119.3.210.172:8080/api/view/34c7c9d462e94d31a8228b369c5e82ffef8525a44509fdd95a4fd3ab10e723a7)
+![操作流程](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/34c7c9d462e94d31a8228b369c5e82ffef8525a44509fdd95a4fd3ab10e723a7.png)
 
 ### 查询缓存配置
 
@@ -1699,11 +1699,11 @@ unlock tables;
 
 #### 读锁案例
 
-![读锁](http://119.3.210.172:8080/api/view/c008a988378e6f6e6e10d42e5268351224c2875561ee52ef013a405d96002b2d)
+![读锁](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/c008a988378e6f6e6e10d42e5268351224c2875561ee52ef013a405d96002b2d.png)
 
 #### 写锁案例
 
-![写锁](http://119.3.210.172:8080/api/view/64d7a84fe67cb3c51d3c1b669bf17740bbad071c96f92d15ea0d88aa7d94b280)
+![写锁](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/64d7a84fe67cb3c51d3c1b669bf17740bbad071c96f92d15ea0d88aa7d94b280.png)
 
 #### 查看锁的竞争情况
 
@@ -1814,7 +1814,7 @@ show index from test_innodb_lock;
 
 示例
 
-![间隙锁](http://119.3.210.172:8080/api/view/1184f987a972e8656de5c30a7d6585f636d2dcf8ac40ff45a8ffd305d6cdfb6c)
+![间隙锁](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/1184f987a972e8656de5c30a7d6585f636d2dcf8ac40ff45a8ffd305d6cdfb6c.png)
 
 #### InnoDB行锁竞争情况
 
@@ -2299,7 +2299,7 @@ mysql支持一台主库同时向多台从库进行复制，从库同时也可以
 
 ### 复制原理
 
-![主从复制](http://119.3.210.172:8080/api/view/0a2737ec7aada93440c737f49de40f107991c1dd0b964d11c2b3606dfcd10078)
+![主从复制](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/0a2737ec7aada93440c737f49de40f107991c1dd0b964d11c2b3606dfcd10078.png)
 
 从上图来看，复制分为三步：
 
