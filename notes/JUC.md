@@ -803,3 +803,200 @@ public class Test4 {
 ##### 思考
 
 synchronized实际是用**对象锁**保证了**临界区内代码的原子性**，临界区内的代码对外是不可分割的，不会被线程切换锁打断
+
+##### 面向对象改进
+
+```java
+public class Test4 {
+  public static void main (String[] args) {
+    Room room = new Room();
+    Thread t1 = new Thread(() -> {
+      for (int i = 0; i < 5000; i++) {
+        room.increment();
+      }
+    }, "t1");
+    Thread t2 = new Thread(() -> {
+      for (int i = 0; i < 5000; i++) {
+        room.decrement();
+      }
+    }, "t2");
+    t1.start();
+    t2.start();
+    t1.join();
+    t2.join();
+    System.out.println(room.getCounter());
+  }
+}
+
+class Room {
+  private static int counter = 0;
+  
+  public void increment() {
+    synchronized(this) {
+      counter++;
+    }
+  }
+  
+  public void decrement() {
+    synchronized(this) {
+			counter--;
+    }
+  }
+  
+  public int getCounter() {
+    synchronized(this) {
+      return counter;
+    }
+  }
+}
+```
+
+### 3.3 方法上的 synchronized
+
+#### 成员方法
+
+```java
+class Test {
+  // 锁住的是 this对象
+  public synchronized void test() {
+  }
+}
+// 等价于
+class Test {
+  public void test() {
+    synchronized(this) {
+		}
+  }
+}
+```
+
+#### 静态方法
+
+```java
+class Test {
+  // 锁住的是 类对象
+  public synchronized static void test() {
+  }
+}
+// 等价于
+class Test {
+  public void test() {
+    synchronized(Test.class) {
+    }
+  }
+}
+```
+
+#### 不加 synchronized的方法
+
+不加 synchronized的方法就好比不遵守规则的人，不老实排队，翻窗户进去
+
+#### 所谓的“线程八锁“
+
+### 3.4 变量的线程安全分析
+
+#### 成员变量和静态变量是否线程安全？
+
+- 如果它们没有共享，则线程安全
+- 如果它们被共享了，根据它们的状态是否能改变，又分两种情况：
+  - 如果只有读操作，则线程安全
+  - 如果有读写操作，则这段代码是临界区，需要考虑线程安全
+
+#### 局部变量是否线程安全？
+
+- 局部变量是线程安全的
+- 但局部变量引用的对象则未必
+  - 如果该对象没有逃离方法的作用范围，它是线程安全的
+  - 如果该对象逃离方法的作用范围（如 return出来），需要考虑线程安全
+
+#### 局部变量线程安全分析
+
+```java
+public static void test1() {
+  int i = 10;
+  i++;
+}
+```
+
+每个线程调用 test1()方法时局部变量 i，会在每个线程的栈帧内存中被创建多份，因此不存在共享
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/thread_inside_variable-2022-04-13-2ebea316efa7aa08377845e315a040d9-b5b976.png" alt="thread_inside_variable" style="zoom:67%;" />
+
+局部变量的引用稍有不同。成员变量例子：
+
+```java
+public class Test {
+  static final int THREAD_NUMBER = 2;
+  static final int LOOP_NUMBER = 200;
+  public static void main(String[] args) {
+    ThreadUnsafe test = new ThreadUnsafe();
+    for (int i = 0; i < THREAD_NUMBER; i++) {
+      new Thread(() -> {
+        test.method1(LOOP_NUMBER);
+      }, "Thread" + i).start();
+    }
+  }
+}
+
+class ThreadUnsafe {
+  // 成员变量
+  ArrayList<String> list = new ArrayList<>();
+
+  public void method1(int loopNumber) {
+    for (int i = 0; i < loopNumber; i++) {
+      // 临界区，会产生竞态条件
+      method2();
+      method3();
+    }
+  }
+  
+  private void method2() {
+    list.add("1");
+  }
+  
+  private void method3() {
+    list.remove();
+  }
+}
+```
+
+其中一种情况，如果线程 2还未 add，线程1 remove就会报 **IndexOutOfBoundsException**
+
+分析：
+
+- 无论哪个线程中的 method2引用的都是同一个对象中的 list成员变量
+- method3和method2分析相同
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/thread_heap_variable-2022-04-13-9d68cbd59337452e3e14364b674d068e-4ee72a.png" alt="thread_heap_variable" style="zoom: 50%;" />
+
+将成员变量list修改为局部变量，就不会有上述问题，例子：
+
+```java
+class ThreadUnsafe {
+  public void method1(int loopNumber) {
+    // 局部变量
+  	ArrayList<String> list = new ArrayList<>();
+    for (int i = 0; i < loopNumber; i++) {
+      // 临界区，会产生竞态条件
+      method2(list);
+      method3(list);
+    }
+  }
+  
+  private void method2(ArrayList<String> list) {
+    list.add("1");
+  }
+  
+  private void method3(ArrayList<String> list) {
+    list.remove();
+  }
+}
+```
+
+分析：
+
+- list是局部变量，每个线程调用时会创建其不同实例，没有共享
+- 而method2的参数是从method1中传递过来的，与method1中引用同一个对象
+- method3的参数分析与method2相同
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/thread_head_variable2-2022-04-14-64c653fcc857d9a6d7de401e3bd91f8c-1cf2b7.png" alt="thread_head_variable2"  />
