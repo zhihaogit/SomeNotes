@@ -1,4 +1,8 @@
-# 并发编程
+# JUC 并发编程
+
+> JUC是 在Java 5.0添加的 java.util.concurrent包的简称，目的就是为了更好的支持[高并发](https://so.csdn.net/so/search?q=高并发&spm=1001.2101.3001.7020)任务，
+>
+> 让开发者利用这个包进行的[多线程](https://so.csdn.net/so/search?q=多线程&spm=1001.2101.3001.7020)编程时可以有效的减少竞争条件和死锁线程
 
 ## 1. 进程与线程
 
@@ -573,10 +577,229 @@ public class Test8 {
 
 ### 2.11 主线程和守护线程
 
+默认情况下，Java进程需要等待所有线程都运行结束，才会结束。有一种特殊的线程叫做守护线程，只要其它线程运行结束了，即使守护线程的代码没有执行完成，也会强制结束
+
+```java
+System.out.println("main start...");
+Thread t1 = new Thread(() -> {
+  System.out.println("thread start...");
+  Thread.sleep(2000);
+  System.out.println("thread end...");
+}, "daemon");
+// 设置该线程为守护线程
+t1.setDaemon(true);
+t1.start();
+
+Thread.sleep(1000);
+System.out.println("main end...");
+
+// 输出
+// [main] c.TestDaemon - main start...
+// [daemon] c.TestDaemon - thread start...
+// [main] c.TestDaemon - main end...
+```
+
+注意：
+
+- 垃圾回收器就是一种守护线程
+- Tomcat中的 Acceptor和 Poller线程都是守护线程，所以 Tomcat接收到 shutdown命令后，不会等待它们处理完当前请求
+
 ### 2.12 五种状态
 
+这是从**操作系统**层面来描述
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/thread_5_status-2022-04-13-77ffcf219a1812ba14606cdca1893e0b-053698.png" alt="thread_5_status" style="zoom: 25%;" />
+
+- 初始状态：仅是在语言层面创建了线程对象，还未与操作系统线程关联
+- 可运行状态：（就绪状态）指该线程已经被创建（与操作系统线程关联），可以由cpu调度执行
+- 运行状态：指获取了cpu时间片运行中的状态
+  - 当 cpu时间片用完，会从**运行状态**转换至**可运行状态**，会导致线程的上下文切换
+
+- 阻塞状态：
+  - 如果调用了阻塞api，如bio读写文件，这时该线程实际不会用到cpu，会导致线程上下文切换，进入**阻塞状态**
+  - 等bio操作完毕，会有操作系统唤醒阻塞的线程，转换至**可运行状态**
+  - 与**可运行状态**的区别是，对**阻塞状态**的线程来说只要它们一直不唤醒，调度器就一直不会考虑调度它们
+- 终止状态：表示线程已经执行完毕，生命周期已经结束，不会再转换为其它线程
+
 ### 2.13 六种状态
+
+从 Java API层面来描述，根据 Thread.State枚举，分为六种状态
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/thread_6_state-2022-04-13-45b7cc7190060860939559c3ad12fbb4-cf427e.png" alt="thread_6_state" style="zoom: 25%;" />
+
+- NEW：线程刚被创建，但还没有调用 start()方法
+- RUNNABLE：当调用了 start()方法之后，注意，java api层面的 RUNNABLE状态包含了操作系统层面的**可运行状态**，**运行状态**和**阻塞状态**（由bio导致的线程阻塞，在java中无法区分，仍然认为是可运行的）
+- BLOCKED,WAITING,TIMED_WAITING：都是java api层面对**阻塞状态**的细分
+- TERMINATED：当线程代码运行结束
 
 ### 2.14 习题
 
 #### *应用之统筹（烧水泡茶）
+
+分析：
+
+```mermaid
+graph LR
+a(洗水壶 1分钟) --> b(烧开水 15分钟)
+c(洗茶壶,洗茶杯,拿茶叶 4分钟)
+b --> f(泡茶)
+c --> f(泡茶)
+```
+
+代码实现：
+
+```java
+Thread t1 = new Thread(() -> {
+  System.out.println("洗水壶");
+  Thread.sleep(1);
+  System.out.println("烧开水");
+  Thread.sleep(15);
+}, "p1");
+Thread t2 = new Thread(() -> {
+  System.out.println("洗茶壶,洗茶杯,拿茶叶");
+  Thread.sleep(4);
+	t1.join();
+  System.out.println("泡茶");
+});
+t1.start();
+t2.start();
+```
+
+## 3 共享模型之管程
+
+### 3.1 共享带来的问题
+
+由于分时系统造成的线程切换而导致的安全问题
+
+#### java代码体现
+
+两个线程对初始值为 0的静态变量，一个自增，一个自减，各做5000。结果不一定为 0
+
+```java
+static int counter = 0;
+public static void main (String[] args) {
+  Thread t1 = new Thread(() -> {
+    for (int i = 0; i < 5000; i++) {
+      counter++;
+    }
+  }, "t1");
+  Thread t2 = new Thread(() -> {
+    for (int i = 0; i < 5000; i++) {
+			counter--;
+    }
+  }, "t2");
+  t1.start();
+  t2.start();
+  t1.join();
+  t2.join();
+  System.out.println(counter);
+}
+```
+
+#### 问题分析
+
+i++产生的 JVM字节码指令
+
+```java
+getstatic i // 获取静态变量 i的值
+iconst_1    // 准备常量 1
+iadd        // 自增
+putstatic i	// 将修改后的值存入静态变量 i
+```
+
+i--产生的 JVM字节码指令
+
+```java
+getstatic i
+iconst_1
+isub        // 自减
+putstatic i // 存入
+```
+
+#### 临界区Critical Section
+
+- 一个程序运行多个线程本身是没有问题的
+- 问题出在多个线程访问**共享资源**
+  - 多个线程读**共享资源**其实也没有问题
+  - 在多个线程对**共享资源**读写操作时发生指令交错，就会出现问题
+- 一段代码内如果存在对**共享资源**的多线程读写操作，称这段代码块叫做**临界区**
+
+```java
+static int counter = 0;
+
+static void increment()
+// 临界区
+{ counter++; }
+
+static void decrement()
+// 临界区
+{ counter--; }
+```
+
+#### 竞态条件 Race Condition
+
+多个线程在临界区内执行，由于代码的执行序列不同而导致结果无法预测，称之为发生了**竞态条件**
+
+### 3.2 synchronized解决方案
+
+#### *应用之互斥
+
+为了避免临界区的竞态条件发生，有多种手段可以实现：
+
+- 阻塞式的解决方式：synchronized, Lock
+- 非阻塞式的解决方式：原子变量
+
+syschronized俗称**对象锁**，它采用互斥的方式让同一时刻至多只有一个线程能持有**对象锁**，其它线程再想获取这个**对象锁**时就会被阻塞住，这样就能保证拥有锁的线程可以安全的执行临界区内的代码，不用担心线程上下文切换
+
+> 注意
+>
+> 虽然 java中互斥和同步都可以采用 synchronized关键字来完成，但是有区别的：
+>
+> - 互斥是保证临界区的竞态条件发生，同一时刻只能有一个线程执行临界区代码
+> - 同步是由于线程执行的先后顺序不同，需要一个线程等待其它线程运行到某个点
+
+#### synchronized
+
+##### 语法
+
+```java
+synchronized()
+{
+// 临界区
+}
+```
+
+##### 解决 counter问题
+
+```java
+public class Test4 {
+  static int counter = 0;
+  static Object room = new Object();
+
+  public static void main (String[] args) {
+    Thread t1 = new Thread(() -> {
+      for (int i = 0; i < 5000; i++) {
+        synchronized(room) {
+          counter++;
+        }
+      }
+    }, "t1");
+    Thread t2 = new Thread(() -> {
+      for (int i = 0; i < 5000; i++) {
+        synchronized(room) {
+          counter--;
+        }
+      }
+    }, "t2");
+    t1.start();
+    t2.start();
+    t1.join();
+    t2.join();
+    System.out.println(counter);
+  }
+}
+```
+
+##### 思考
+
+synchronized实际是用**对象锁**保证了**临界区内代码的原子性**，临界区内的代码对外是不可分割的，不会被线程切换锁打断
