@@ -72,7 +72,7 @@ service iptables stop
 
 mysql索引的官方定义：索引（index）是帮助 mysql高效获取数据的数据结构（有序）。在数据之外，数据库系统还维护着满足特定查找算法的数据结构，这些数据结构以某种方式引用（指向）数据，这样就可以在这些数据结构上实现高级查找算法，这种数据结构就是`索引`。如下图所示：
 
-![索引示意图](http://119.3.210.172:8080/api/view/2385455a525e09afbd962313190f2ea1be880d4b78129c62f2cadb8a8146b632)
+![索引示意图](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/2385455a525e09afbd962313190f2ea1be880d4b78129c62f2cadb8a8146b632-2022-04-13-68d60703da96b1564678be287915cbe0-bf6fe7.png)
 
 ### 优劣势
 
@@ -119,7 +119,7 @@ BTREE又叫多路平衡搜索树，一棵 m叉的 BTREE特性如下：
 - 所有的叶子节点都在同一层
 - 每个非叶子节点由 n个 key与 n + 1个指针组成，其中 `ceil(m / 2) - 1<= n <= n -1`
 
-![BTREE](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/8e8d8a90ec4b92bdedfea267735f292f34a30b9e25995a3f84d225552665ab6e.png)
+![BTREE](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/8e8d8a90ec4b92bdedfea267735f292f34a30b9e25995a3f84d225552665ab6e-20220413101704991-2022-04-13-bbd1f0b691a866c7f1e978fba04f79f3-9668db.png)
 
 BTREE树与二叉树相比，查询效率更高。因为对于相同的数据量来说，BTREE的层级结构比二叉树小，因此搜索速度快。
 
@@ -131,7 +131,7 @@ B+TREE是 BTREE的变种，其区别如下：
 - B+TREE的叶子节点包含所有的 key信息，依 key大小顺序排列
 - 所有的非叶子节点都可以看作是 key的索引部分
 
-![B+TREE](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/56aa4e5f50a0f6a4cbc386545fa05d1983d1a72ce6c0827332502a2c8d973f35.png)
+![B+TREE](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/56aa4e5f50a0f6a4cbc386545fa05d1983d1a72ce6c0827332502a2c8d973f35-20220413101709291-2022-04-13-423f1d2f60b6672266157e04ffd9b6d6-e6bc4b.png)
 
 由于B+TREE只有叶子节点保存 key信息，查询任何 key都要从 root走到叶子。所以 B+TREE的查询效率更加稳定
 
@@ -139,7 +139,7 @@ B+TREE是 BTREE的变种，其区别如下：
 
 mysql索引数据结构对经典的 B+TREE进行了优化。在原 B+TREE的基础上，增加一个指向相邻叶子节点的链表指针，就形成了带有顺序指针的 B+TREE，提高了区间（范围）访问的性能。
 
-![mysql_B+TREE](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/6662230a5c89103a937949a386128c2bb125541555c70e67dcce5e9ca48242b9.png)
+![mysql_B+TREE](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/6662230a5c89103a937949a386128c2bb125541555c70e67dcce5e9ca48242b9-20220413101714802-2022-04-13-4f25b9b53537cf14e4ca886533d9718f-aa62aa.png)
 
 ### 索引分类
 
@@ -782,7 +782,7 @@ show triggers;
 
 ## Mysql的体系结构
 
-![体系结构](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/71e20eb10f6c31dbf57e0fdc55ac43eedad032d5d97b38c8e1b2770f051582cf.png)
+![体系结构](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/71e20eb10f6c31dbf57e0fdc55ac43eedad032d5d97b38c8e1b2770f051582cf-20220413101734347-2022-04-13-ef65c6106749be27012a93b0e8670d48-893970.png)
 
 ### 组成部分
 
@@ -1496,7 +1496,7 @@ explain select * from tb_seller force index(idx_seller_name) where name '小米�
 
 ### 操作流程
 
-![操作流程](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/34c7c9d462e94d31a8228b369c5e82ffef8525a44509fdd95a4fd3ab10e723a7.png)
+![操作流程](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/34c7c9d462e94d31a8228b369c5e82ffef8525a44509fdd95a4fd3ab10e723a7-20220413101755448-2022-04-13-5752765809242a16859e1b649b49a34b-a801d8.png)
 
 ### 查询缓存配置
 
@@ -1699,7 +1699,7 @@ unlock tables;
 
 #### 读锁案例
 
-![读锁](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/c008a988378e6f6e6e10d42e5268351224c2875561ee52ef013a405d96002b2d.png)
+![读锁](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/c008a988378e6f6e6e10d42e5268351224c2875561ee52ef013a405d96002b2d-20220413101803789-2022-04-13-fc0f7ffdf3a3a76fb20856eb72014da5-92e03c.png)
 
 #### 写锁案例
 
@@ -1814,7 +1814,7 @@ show index from test_innodb_lock;
 
 示例
 
-![间隙锁](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/1184f987a972e8656de5c30a7d6585f636d2dcf8ac40ff45a8ffd305d6cdfb6c.png)
+![间隙锁](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/1184f987a972e8656de5c30a7d6585f636d2dcf8ac40ff45a8ffd305d6cdfb6c-20220413101811736-2022-04-13-a6975c70781e755d0d4d82c6bfc7194d-90e6ef.png)
 
 #### InnoDB行锁竞争情况
 
@@ -2299,7 +2299,7 @@ mysql支持一台主库同时向多台从库进行复制，从库同时也可以
 
 ### 复制原理
 
-![主从复制](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/0a2737ec7aada93440c737f49de40f107991c1dd0b964d11c2b3606dfcd10078.png)
+![主从复制](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/0a2737ec7aada93440c737f49de40f107991c1dd0b964d11c2b3606dfcd10078-20220413101826005-2022-04-13-8fd38cd7f0d170705dc228ab2580b79c-d824f1.png)
 
 从上图来看，复制分为三步：
 
