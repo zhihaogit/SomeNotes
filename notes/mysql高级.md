@@ -1699,11 +1699,11 @@ unlock tables;
 
 #### 读锁案例
 
-![读锁](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/c008a988378e6f6e6e10d42e5268351224c2875561ee52ef013a405d96002b2d-20220413101803789-2022-04-13-fc0f7ffdf3a3a76fb20856eb72014da5-92e03c.png)
+![读锁](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/c008a988378e6f6e6e10d42e5268351224c2875561ee52ef013a405d96002b2d-20220413101803789-2022-04-13-fc0f7ffdf3a3a76fb20856eb72014da5-92e03c-2022-04-13-fc0f7ffdf3a3a76fb20856eb72014da5-c39e44.png)
 
 #### 写锁案例
 
-![写锁](https://obs-bucket-zino-1.obs.cn-north-4.myhuaweicloud.com/images/64d7a84fe67cb3c51d3c1b669bf17740bbad071c96f92d15ea0d88aa7d94b280.png)
+![写锁](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/64d7a84fe67cb3c51d3c1b669bf17740bbad071c96f92d15ea0d88aa7d94b280-20220413102134841-2022-04-13-f55c6380b3181aa5b6425b7bd5583bc3-9cd9f7.png)
 
 #### 查看锁的竞争情况
 
