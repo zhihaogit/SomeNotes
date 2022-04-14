@@ -924,6 +924,8 @@ public static void test1() {
 
 局部变量的引用稍有不同。成员变量例子：
 
+成员变量的生命周期是从**类**的创建到消失，因此在堆内存中只有一份，所以不是线程安全的
+
 ```java
 public class Test {
   static final int THREAD_NUMBER = 2;
@@ -969,10 +971,10 @@ class ThreadUnsafe {
 
 <img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/thread_heap_variable-2022-04-13-9d68cbd59337452e3e14364b674d068e-4ee72a.png" alt="thread_heap_variable" style="zoom: 50%;" />
 
-将成员变量list修改为局部变量，就不会有上述问题，例子：
+将成员变量list修改为局部变量，并且不暴露出去，就不会有上述问题，例子：
 
 ```java
-class ThreadUnsafe {
+class ThreadSafe {
   public void method1(int loopNumber) {
     // 局部变量
   	ArrayList<String> list = new ArrayList<>();
@@ -988,7 +990,7 @@ class ThreadUnsafe {
   }
   
   private void method3(ArrayList<String> list) {
-    list.remove();
+    list.remove(0);
   }
 }
 ```
@@ -1000,3 +1002,173 @@ class ThreadUnsafe {
 - method3的参数分析与method2相同
 
 <img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/thread_head_variable2-2022-04-14-64c653fcc857d9a6d7de401e3bd91f8c-1cf2b7.png" alt="thread_head_variable2"  />
+
+方法访问修饰符带来的思考，如果把 method2和 method3的方法修改为 public会不会带来线程安全问题？
+
+- 情况1：有其它线程调用 method2和 method3
+- 情况2：在情况1的基础上，为 ThreadSafe类添加子类，子类覆盖 method2和 method3，即
+
+```java
+class ThreadSafe {
+	// 可以加 final
+  public void method1(int loopNumber) {
+    // 局部变量
+  	ArrayList<String> list = new ArrayList<>();
+    for (int i = 0; i < loopNumber; i++) {
+      // 临界区，会产生竞态条件
+      method2(list);
+      method3(list);
+    }
+  }
+  
+  // public改为 private，子类不会直接覆盖父类的方法
+  public void method2(ArrayList<String> list) {
+    list.add("1");
+  }
+  
+  public void method3(ArrayList<String> list) {
+    list.remove(0);
+  }
+}
+
+class ThreadSafeSubClass extends ThreadSafe {
+  @override
+  public void method3(ArrayList<String> list) {
+    new Thread(() -> {
+      list.remove(0);
+    }).start();    
+  }
+}
+```
+
+private和 final是能保护线程安全的，【开闭原则】的【闭】
+
+#### 常见线程安全类
+
+- String
+- Integer
+- StringBuffer
+- Random
+- Vector
+- Hashtable
+- java.util.concurrent包下的类
+
+这里说它们是线程安全的，是指多个线程调用它们同一个实例的某个方法时，是线程安全的。也可以理解为
+
+- 它们的每个方法都是原子的
+- 但注意它们多个方法的组合不是原子的
+
+##### 线程安全类方法的组合
+
+分析下面代码是否是线程安全的？
+
+```java
+Hashtable table = new Hashtable();
+
+new Thread(() -> {
+  if (table.get("key") == null) {
+    table.put("key", "value1");
+  }
+}).start();
+
+new Thread(() -> {
+  if (table.get("key") == null) {
+    table.put("key", "value2");
+  }
+}).start();
+```
+
+```mermaid
+sequenceDiagram
+participant t1 as 线程1
+participant t2 as 线程2
+participant table
+t1 ->> table : get("key") == null
+t2 ->> table : get("key") == null
+t2 ->> table : put("key", "value2")
+t1 ->> table : put("key", "value1")
+```
+
+##### 不可变类线程安全性
+
+String,Integer等都是不可变类，因为其内部的状态不可以改变，所以它们的方法都是线程安全的
+
+#### 实例分析
+
+```java
+public abstract class Test {
+  public void bar() {
+    // 是否线程安全
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    foo(sdf);
+  }
+  
+  public abstract foo(SimpleDateFormat sdf);
+  
+  public static void main(String[] args) {
+    new Test().bar();
+  }
+}
+```
+
+该例子不是线程安全的，其中 foo的行为是不确定，可能导致不安全的发生，被称之为**外星方法**
+
+### 3.5 Monitor概念
+
+#### Java对象头
+
+以 32为虚拟机为例
+
+Integer 8字节 + 4字节
+
+int 4字节
+
+普通对象
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/normal_object_head-2022-04-14-e53a392835d1a05e5261fb9a8037f7b6-c5a868.png" alt="normal_object_head"  />
+
+数组对象
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/array_object_head-2022-04-14-38e1bbe88b88d4e12a6c4a0f0290e688-a3b1f4.png" alt="array_object_head"  />
+
+其中 Mark Word结构为
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/mark_word-2022-04-14-5b4009436e20787dda0e6a369358936d-8bd6f6.png" alt="mark_word"  />
+
+#### Monitor(锁)
+
+Monitor被翻译为**监视器**或**管程**
+
+每个java对象都可以关联一个 Monitor对象，如果使用 synchronized给对象上锁（重量级）之后，该对象头的 Mark Word中就被设置指向 Monitor对象的指针
+
+Monitor结构如下：
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/object_monitor-2022-04-14-86e219980eeb8cb28d89bea302b56718-d91252.png" alt="object_monitor" style="zoom:50%;" />
+
+- 刚开始 Monitor中 Owner为 null
+- 当 Thread-2执行 synchronized(obj)就会将 Monitor的所有者 Owner置为 Thread-2，Monitor中只能有一个 Owner
+- 在 Thread-2上锁的过程中，如果Thread-3，Thread-4，Thread-5也来执行 synchronzied(obj)，就会进入 EntryList BLOCKED
+- Thread-2执行完同步代码块的内容，然后唤醒 EntryList中等待的线程来竞争锁，竞争的时候是非公平的
+- 图中 WaitSet中的 Thread-0，Thread-1是之前获得过锁，但条件不满足进入 WAITING状态的线程
+
+> 注意
+>
+> - synchronized必须是进入同一个对象的 monitor才有上述的效果
+> - 不加 synchronized的对象不会关联监视器，不遵守以上规则
+
+#### *原理之synchronized
+
+```java
+static final object lock = new Object();
+static int counter = 0;
+
+public static void main(String[] args) {
+  synchronized(lock) {
+    counter++;
+  }
+}
+```
+
+对应的字节码：
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/synchronized_byte_code-2022-04-14-6c10e2b94eea437aa9182a8b7200f3c1-f8f67f.png" alt="synchronized_byte_code" style="zoom:25%;" />
