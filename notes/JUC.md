@@ -924,7 +924,7 @@ public static void test1() {
 
 局部变量的引用稍有不同。成员变量例子：
 
-成员变量的生命周期是从**类**的创建到消失，因此在堆内存中只有一份，所以不是线程安全的
+静态变量的生命周期是从**类**的创建到消失，因此在堆内存中只有一份，所以不是线程安全的
 
 ```java
 public class Test {
@@ -1156,19 +1156,3 @@ Monitor结构如下：
 > - synchronized必须是进入同一个对象的 monitor才有上述的效果
 > - 不加 synchronized的对象不会关联监视器，不遵守以上规则
 
-#### *原理之synchronized
-
-```java
-static final object lock = new Object();
-static int counter = 0;
-
-public static void main(String[] args) {
-  synchronized(lock) {
-    counter++;
-  }
-}
-```
-
-对应的字节码：
-
-<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/synchronized_byte_code-2022-04-14-6c10e2b94eea437aa9182a8b7200f3c1-f8f67f.png" alt="synchronized_byte_code" style="zoom:25%;" />
