@@ -70,3 +70,249 @@ class TwoPhaseTermination {
 }
 ```
 
+## 同步模式之保护性暂停
+
+### 定义
+
+即 Guarded Suspension，用在一个线程等待另一个线程的执行结果
+
+要点
+
+- 有一个结果需要从一个线程传递到另一个线程，让它们关联到同一个 GuardedObject
+- 如果有结果不断从一个线程到另一个线程，那么可以使用消息队列（见生产者/消费者）
+- jdk中，join的实现，Future的实现，采用的就是此模式
+- 因为要等待另一方的结果，因此归类到同步模式
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/guarded_suspension-2022-04-18-0c09bde7d4c8342954b04f411c715e44-f2ef9e.png" alt="guarded_suspension"  />
+
+### 实现
+
+```java
+public class Test {
+  public static void main(String[] args) {
+    GuardedObject obj = new GuardedObject();
+    new Thread(() -> {
+      System.out.println("等待结果");
+      List<String> list = (List<String>) obj.get();
+      System.out.println("结果大小: {}".format(list.size()));
+    }, "t1").start();
+    
+    new Thread(() -> {
+      System.out.println("执行下载");
+      try {
+        List<String> list = Downloader.download();
+        obj.complete(list);
+      } catch(IOExceptipn e) {
+				e. printStackTrace(e);
+      }
+    }, "t2").start();
+  }
+}
+
+class GuardedObject {
+  // 结果
+  private Object response;
+  
+  // 获取结果
+  public Object get() {
+    synchronized(this) {
+      // 没有结果
+      while(response == null) {
+        try {
+          this.wait();
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+      return response;
+    }
+  }
+  
+ 	// 产生结果
+  public void complete(Object response) {
+    synchronized(this) {
+      // 给结果成员变量赋值
+      this.response = response;
+      this.notifyAll();
+    }
+  }
+}
+```
+
+### 超时效果实现
+
+```java
+class GuardedObject {
+	private Object response;
+  
+  // timeout - 需要等待的总时间
+  public Object get(long timeout) {
+    synchronized(this) {
+      // 1. 开始计时
+      long begin = System.currentTimeMillis();
+      // 2-1. 经过的时间
+			long passedTime = 0L;
+      while(response == null) {
+        // 3. 还需要等待的时间
+        long waitTime = timeout - passedTime;
+        if (waitTime <= 0) {
+          break;
+        }
+       	try {
+          this.wait(waitTime);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        // 2-2. 已经执行了多久
+        passedTime = System.currentTimeMillis() - begin;
+      }
+      return response;
+    }
+  }
+}
+```
+
+### *原理之 join
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/join_jdk_code-2022-04-18-75a3f491468f1a0f70886c1f40736c3c-9da973.png" alt="join_jdk_code" style="zoom: 67%;" />
+
+### 拓展
+
+图中 Futures就好比居民楼一层的信箱（每个信箱有房间编号），左侧的 t0，t1，t4就好比等待邮件的居民，右侧的 t1，t3，t5就好比邮递员
+
+如果需要在多个类之间使用 GuardedObject对象，作为参数传递不是很方便，因此设计一个用来解耦的中间类，这样不仅能够解耦【结果等待者】和【结果生产者】，还能够同时支持多个任务的管理
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/feature_guarded_object-2022-04-18-4e5fbf539801427944ced6790a38b9fa-ec2384.png" alt="feature_guarded_object" style="zoom:67%;" />
+
+实现：
+
+```java
+public class Test {
+	public static void main(String[] args) throws InterruptedException {
+    for (int i = 0; i < 3; i++) {
+      new People().start();
+    }
+    
+    Thread.sleep(1000);
+    for (Integer id : Mailboxes.getIds()) {
+      new Postman(id, "内容" + id).start();
+    }
+  }
+}
+
+class People extends Thread {
+  @Override
+  public void run() {
+    // 收信
+    GuardedObject obj = Mailboxes.createGuardedObject();
+    System.out.println("开始收信, id: {}".format(obj.getId()));
+    Object mail = obj.get(5000);
+    System.out.println("收到信, id: {}, 内容: {}".format(obj.getId(), mail));
+  }
+}
+
+class Postman extends Thread {
+  private int id;
+  private String mail;
+  
+  public Postman(int id, String mail) {
+    this.id = id;
+    this.mail = mail;
+  }
+
+  @Override
+  public void run() {
+    // 收信
+    GuardedObject obj = Mailboxes.getGuardedObject(id);
+    System.out.println("送信, id: {}, 内容: {}".format(obj.getId(), mail));
+    Object mail = obj.complete(mail);
+  }
+}
+
+class Mailboxes {
+  private static Map<Integer, GuardedObject> boxes = new Hashtable<>();
+
+  private static int id = 1;
+
+  // 产生唯一 id
+  private static synchronized int generateId() {
+    return id++;
+  }
+
+  public static GuardedObject getGuardedObject(int id) {
+    return boxes.remove(id);
+  }
+
+  public static GuardedObject createGuardedObject() {
+    GuardedObject obj = new GuardedObject(generateId());
+    boxes.put(obj.getId(), obj);
+    return obj;
+  }
+
+  public static Set<Integer> getIds() {
+    return boxes.keySet();
+  }
+}
+
+class GuardedObject {
+  private int id;
+
+	private Object response;
+  
+  public void GuardedObject(int id) {
+    this.id = id;
+	}
+  
+  public int getId() {
+    return this.id;
+  }
+  
+  // timeout - 需要等待的总时间
+  public Object get(long timeout) {
+    synchronized(this) {
+      // 1. 开始计时
+      long begin = System.currentTimeMillis();
+      // 2-1. 经过的时间
+			long passedTime = 0L;
+      while(response == null) {
+        // 3. 还需要等待的时间
+        long waitTime = timeout - passedTime;
+        if (waitTime <= 0) {
+          break;
+        }
+       	try {
+          this.wait(waitTime);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        // 2-2. 已经执行了多久
+        passedTime = System.currentTimeMillis() - begin;
+      }
+      return response;
+    }
+  }
+
+ 	// 产生结果
+  public void complete(Object response) {
+    synchronized(this) {
+      // 给结果成员变量赋值
+      this.response = response;
+      this.notifyAll();
+    }
+  }
+}
+```
+
+## 异步模式之生产者/消费者
+
+#### 定义
+
+要点
+
+- 与前面的保护性暂停中的 GuardedObject不同，不需要产生结果和消费结果的线程一一对应
+- 消费者队列可以用来平衡生产和消费的线程资源
+- 生产者仅负责产生结果数据，不关心数据该如何处理，而消费者专心处理结果数据
+- 消费队列是有容量限制的，满时不会再加入数据，空时不会再消耗数据
+- jdk中各种阻塞队列，采用的就是这种模式
+
+![guarded_suspension2](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/guarded_suspension2-2022-04-19-5620f513e85bdabfff7cdb5fd7ecdc09-ddb102.png)

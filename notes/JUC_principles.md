@@ -180,8 +180,6 @@ synchronized(d) {}
 
 调用对象的 hashCode方法，会把 hashCode添加到 mark word中，由于偏向锁没有空间存储 hashCode，会被禁用转向正常状态对象
 
-轻量级锁的 hashCode会存在栈帧的锁记录里，重量级锁的 hashCode会存在 Monitor对象中
-
 ```java
 Dog d = new Dog();
 d.hashCode();
@@ -190,15 +188,105 @@ synchronized(d) {}
 
 #### 撤销-调用对象 hashCode
 
+调用了对象的hashcode，但偏向锁的对象 mark word中存储的是线程id，如果调用 hashcode会导致偏向锁被撤销
+
+- 轻量级锁的 hashCode会存在栈帧的锁记录里
+- 重量级锁的 hashCode会存在 Monitor对象中
+
+在调用 hashcode后使用偏向锁，需要去掉 `-XX:-UseBiasedLocking`
+
 #### 撤销-其它线程使用对象
+
+当有其它线程使用偏向锁对象时，会将偏向锁升级为轻量级锁
+
+```java
+public class TestBiased {
+	private static void test2() throws InterruptedException {
+    Dog d = new Dog();
+    Thread t1 = new Thread(() -> {
+      synchronized(d) {
+        System.out.println(ClassLayout.parseInstace(d).toPrintableSimple(true));
+      }
+      System.out.println(ClassLayout.parseInstace(d).toPrintableSimple(true));
+
+      // 防止线程们交错竞争锁，导致生成重量级锁
+      synchronized(TestBiased.class) {
+        TestBiased.class.notify();
+      }
+    }, "t1").start();
+    
+    Thread t2 = new Thread(() -> {
+      synchronized(TestBiased.class) {
+        try {
+        	TestBiased.class.wait();
+        } catch(InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+
+      System.out.println(ClassLayout.parseInstace(d).toPrintableSimple(true));
+      synchronized(d) {
+        System.out.println(ClassLayout.parseInstace(d).toPrintableSimple(true));
+      }
+      System.out.println(ClassLayout.parseInstace(d).toPrintableSimple(true));
+    }, "t2").start();
+  }
+}
+```
 
 #### 撤销-调用 wait/notify
 
+只有**重量级锁**才有 `wait/notify`，所以调用该方法会将**轻量级锁**和**偏向锁**升级为**重量级锁**
+
 #### 批量重偏向
+
+如果对象虽然被多个线程访问，但没有竞争，这时偏向了线程 T1的对象仍有机会重新偏向 T2，重偏向会重置对象的 Thread ID
+
+当撤销偏向锁阈值超过 20次后，jvm会这样觉得，自己是不是偏向错了，于是会在给这些对象加锁时重新偏向至加锁线程
 
 #### 批量撤销
 
+当撤销偏向锁阈值超过40次后，jvm会这样觉得，自己确实偏向错了，根本就不该偏向。于是整个类的所有对象都会变成不可偏向的，新建的对象也是不可偏向的
+
 ### 5. 锁消除
+
+锁消除
+
+```java
+@Fork(1)
+@BenchmarkMode(Mode.AverageTime)
+@Warmup(iterations = 3)
+@Measurement(iterations = 5)
+@OutputTimeUnit(TimeUnit.NANOSECONDS)
+public class MyBenchmark {
+  static int x = 0;
+
+  @Benchmark
+  public void a() throws Exception {
+    x++;
+  }
+
+  @Benchmark
+  // JIT 即时编译器会分析热点代码，并优化代码
+  // 逃逸分析 —> 锁消除
+  public void b() throws Exception {
+    Object o = new Object();
+    synchronized(o) {
+      x++;
+    }
+  }
+}
+```
+
+```bash
+# 默认打开 锁消除优化
+java -jar benchmarks.jar
+
+# 关闭 锁消除优化
+java -XX:-EliminteLocks -jar benchmarks.jar
+```
+
+
 
 
 

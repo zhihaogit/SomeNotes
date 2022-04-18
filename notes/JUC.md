@@ -1156,3 +1156,96 @@ Monitor结构如下：
 > - synchronized必须是进入同一个对象的 monitor才有上述的效果
 > - 不加 synchronized的对象不会关联监视器，不遵守以上规则
 
+### 3.6 wait/notify
+
+#### *原理之wait/notify
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/object_monitor-2022-04-14-86e219980eeb8cb28d89bea302b56718-d91252.png" alt="object_monitor" style="zoom:50%;" />
+
+- Owner线程发现条件不满足，调用 wait方法，即可进入 WaitSet变为 WAITING状态
+- BLOCKED和 WAITING的线程都处于阻塞状态，不占用 cpu时间片
+- BLOCKED线程会在 Owner线程释放锁时唤醒
+- WAITING线程会在 Owner线程调用 notify或 notifyAll时唤醒，但唤醒后并不意味着立刻获得所，仍需进入 EntryList重新竞争锁
+
+#### API介绍
+
+- obj.wait()让进入 object监视器的线程到 waitSet等待
+- obj.notify()在 object上正在 waitSet等待的线程中挑一个唤醒
+- obj.notifyAll()让 object上正在 waitSet等待的线程全部唤醒
+
+它们都是线程之间进行协作的手段，都属于 Object对象的方法
+
+必须先获得此对象的锁，才能调用这几个方法
+
+```java
+final static Object obj = new Object();
+
+public static void main(String[] args) {
+  new Thread(() -> {
+    synchronized(obj) {
+      System.out.println("执行...");
+      try {
+        obj.wait(); // 让线程在 Obj上一直等待下去
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+      System.out.println("其它代码...");
+    }
+  }, "t1").start();
+  
+  new Thread(() -> {
+    synchronized(obj) {
+      System.out.println("执行...");
+      try {
+        obj.wait(); // 让线程在 Obj上一直等待下去
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+      System.out.println("其它代码...");
+    }
+  }, "t2").start();
+  
+  // 主线程两秒后执行
+  sleep(2);
+  System.out.println("唤醒 Obj上的线程...");
+  synchronized(obj) {
+    obj.notify(); // 随机唤醒 Obj上的一个线程
+    obj.notifyAll(); // 唤醒 obj上的所有等待线程
+  }
+}
+```
+
+wait()方法会释放对象的锁，进入 WaitSet等待区，从而让其它线程有机会获得对象的锁。无限制的等待，直到 notify为止
+
+`wait(long n)`有时限的等待，到 n毫秒后结束等待，或是被 notify
+
+### 3.7 wait/notify的正确使用
+
+开始之前先看看
+
+`sleep(long n)`和 `wait(long n)`的区别
+
+- sleep是 Thread方法，而 wait是 Object的方法
+- sleep不需要强制和 synchronized配合使用，但 wait需要和 synchronized一起使用
+- sleep在睡眠的同时，不会释放对象的锁，但 wait在等待时会释放对象锁
+
+使用 `while`来防止 `notify`和 `notifyAll`产生的假唤醒
+
+```java
+// 常规使用格式
+// 线程 a
+synchronized(lock) {
+  while(条件不成立) {
+    lock.wait();
+  }
+  // 其他代码
+}
+
+// 线程 b
+synchronized(lock) {
+  lock.notifyAll();
+}
+```
+
+
+
