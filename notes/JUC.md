@@ -665,7 +665,7 @@ t1.start();
 t2.start();
 ```
 
-## 3 共享模型之管程
+## 3. 共享模型之管程
 
 ### 3.1 共享带来的问题
 
@@ -1247,5 +1247,141 @@ synchronized(lock) {
 }
 ```
 
+### 3.8 Park & Unpark
+
+#### 基本使用
+
+它们是 LockSupport类中的方法
+
+```java
+// 暂停当前线程
+LockSupport.park();
+// 恢复某个线程的运行
+LockSupport.unpark(暂停线程对象)
+```
+
+先 park再 unpark
+
+```java
+Thread t1 = new Thread(() -> {
+  System.out.println("start...");
+  sleep(1);
+  System.out.println("park...");
+  LockSupport.park();
+  System.out.println("resume...");
+}, "t1").start();
+
+sleep(2);
+System.out.println("unpark...");
+LockSupport.unpark(t1);
+```
+
+#### 特点
+
+与 Object的 wait & notify相比：
+
+- wait, notify和 notifyAll必须配合 Object Monitor一起使用，而 unpark不必
+- Park & unpark是以线程为单位来【阻塞】和【唤醒】线程，而 notify只能随机唤醒一个等待线程，notifyAll是唤醒所有等待线程，没那么精准
+- Park & unpark可以先 unpark，而 wait & notify不能先 notify
+
+#### *原理之 park & unpark
+
+每个线程都有自己的一个 parker对象，由三部分组成 **_counter**, **_cond**和 **_mutex**(互斥量)
+
+做个比喻：
+
+- 线程就像一个旅人，Parker就像它随身携带的背包，条件变量就好比背包中的帐篷。**_counter**就好比背包中的备用干粮（0为耗尽，1为充足）
+- 调用 Park就要看需不需要停下来歇息
+  - 如果备用干粮耗尽，那么转进帐篷休息
+  - 如果备用干粮充足，那么不需要停留，继续前进
+- 调用 unpark，就好比令干粮充足
+  - 如果这时线程还在帐篷中，就唤醒让他继续前进
+  - 如果这时线程还在运行，那么下次她调用 park时，仅是消耗掉备用干粮，不需停留继续前进
+    - 因为背包空间有限，多次调用 unpark仅会补充一份备用干粮
+
+##### 调用 park
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/park_unpark-2022-04-19-4f4c45c086f46f4e9e0d2e19aaebaadb-57682c.png" alt="park_unpark" style="zoom: 67%;" />
+
+1. 当前线程调用 `Unsafe.park()`方法
+2. 检查**_counter**，本情况为 0，这时获得 **_mutex**互斥锁
+3. 线程进入 **_cond**条件变量阻塞
+4. 设置 `_counter = 0`
+
+##### 调用 unpark
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/park_unpark2-2022-04-20-3b973f650559d6559ca1feefadc207d3-8b0408.png" alt="park_unpark2" style="zoom:67%;" />
+
+1. 调用 `Unsafe.unpark(Thread_0)`方法，设置 **_counter**为 1
+2. 当前线程调用 `Unsafe.park()`方法
+3. 检查 **_counter**，本情况为 1，这时线程无需阻塞，继续运行
+4. 设置 **_counter**为 0
+
+### 3.9 重新理解线程状态转换
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/thread_6_state-2022-04-13-45b7cc7190060860939559c3ad12fbb4-cf427e.png" alt="thread_6_state" style="zoom: 50%;" />
+
+假设有线程 Thread t
+
+#### 情况1 NEW --> RUNNABLE
+
+- 当调用 t.start()方法时，由 NEW --> RUNNABLE
+
+#### 情况2 RUNNABLE <--> WAITING
+
+t线程用 synchronized(obj)获取了对象锁后
+
+- 调用 obj.wait()方法时，t线程从 RUNNABLE --> WAITING
+- 调用 obj.notify(), obj.notifyAll(), t.interrupt()时
+  - 竞争锁成功，t线程从 WAITING --> RUNNABLE
+  - 竞争锁失败，t线程从 WAITING --> BLOCKED
 
 
+#### 情况3 RUNNABLE <--> WAITING
+
+- 当前线程调用 t.join()方法时，当前线程从 RUNNABLE --> WAITING
+  - 注意是当前线程在 t线程对象的监视器上等待
+- t线程运行结束，或调用了当前线程的 interrupt()时，当前线程从 WAITING --> RUNNABLE
+
+#### 情况4 RUNNABLE <--> WAITING
+
+- 当前线程调用 LockSupport.park()方法会让当前线程从 RUNNABLE --> WAITING
+- 调用 LockSupport.unpark(目标线程)或调用了线程的 interrupt()，会从目标线程从 WAITING --> RUNNABLE
+
+#### 情况5 RUNNABLE <--> TIMED_WAITING
+
+t线程用 synchronized(obj)获取了对象锁后
+
+- 调用 obj.wait(long n)方法时，t线程从 RUNNABLE <--> TIMED_WAITING
+- t线程等待时间超过了 n毫秒，或调用 obj.notify(), obj.notifyAll(), t.interrupt()时
+  - 竞争锁成功，t线程从 TIMED_WAITING --> RUNNABLE
+  - 竞争锁失败，t线程从 TIMED_WAITING --> BLOCKED
+
+#### 情况6 RUNNABLE <--> TIMED_WAITING
+
+- 当前线程调用 t.join(long n)方法时，当前线程从 RUNNABLE <--> TIMED_WAITING
+  - 注意是当前线程在 t线程对象的监视器上等待
+- 当前线程等待时间超过了 n毫秒，或 t线程运行结束，或调用了线程的 interrupt()时，当前线程从 TIMED_WAITING --> RUNNABLE
+
+#### 情况7 RUNNABLE <--> TIMED_WAITING
+
+- 当前线程调用 Thread.sleep(long n)，当前线程从 RUNNABLE <--> TIMED_WAITING
+- 当前线程等待时间超过了 n毫秒，当前线程从 TIMED_WAITING --> RUNNABLE
+
+#### 情况8 RUNNABLE <--> TIMED_WAITING
+
+- 当前线程调用 LockSupport.parkNanos(long nanos)或 LockSupport.parkUntil(long millis)时，当前线程从 RUNNABLE --> TIMED_WAITING
+- 调用 LockSupport.unpark(目标线程)或调用了线程的 interrupt()，或是等待超时，会让目标线程从 TIMED_WAITING --> RUNNABLE
+
+#### 情况9 RUNNABLE <--> BLOCKED
+
+- t线程用 synchronized(obj)获取了对象锁时，如果竞争失败，从 RUNNABLE <--> BLOCKED
+- 持 obj锁线程的同步代码块执行完毕，会唤醒该对象上所有 BLOCKED的线程重新竞争
+  - 如果其中 t线程竞争成功，从 BLOCKED --> RUNNABLE
+  - 其他失败的线程仍为 BLOCKED
+
+#### 情况10 RUNNABLE <--> TERMINATED
+
+当前线程所有代码运行完毕，进入 TERMINATED
+
+### 3.10 多把锁

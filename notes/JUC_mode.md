@@ -305,7 +305,7 @@ class GuardedObject {
 
 ## 异步模式之生产者/消费者
 
-#### 定义
+### 定义
 
 要点
 
@@ -316,3 +316,104 @@ class GuardedObject {
 - jdk中各种阻塞队列，采用的就是这种模式
 
 ![guarded_suspension2](https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/guarded_suspension2-2022-04-19-5620f513e85bdabfff7cdb5fd7ecdc09-ddb102.png)
+
+### 实现
+
+```java
+public class Test {
+  public static void main(String[] args) {
+    MessageQueue queue = new MessageQueue(2);
+ 
+    for (int i = 0; i < 3; i++) {
+      int id = i;
+      new Thread(() -> {
+        queue.put(new Message(id, "值" + id));
+      }, "生产者" + i).start();
+    }
+    
+    new Thread(() -> {
+      while(true) {
+        sleep(1);
+        Message message = queue.take();
+      }
+    }, "消费者").start();
+  }
+}
+
+// java线程之间通信，消息队列类
+class MessageQueue {
+  // 消息的队列集合
+  private LinkedList<Message> list = new LinkedList<>();
+  // 队列容量
+  private int capcity;
+  
+  public MessageQueue(int capcity) {
+    this.capcity = capcity;
+  }
+  
+  // 获取消息
+  public Message take() {
+    // 检查对象是否为空
+    synchronized(list) {
+      while(list.isEmpty()) {
+        try {
+          System.out.println("队列为空，消费者线程等待")
+          list.wait();
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+      // 从队列头部获取消息并返回
+      Message message = list.removeFirst();
+      System.out.println("已消费消息: {}".format(message));
+      list.notifyAll();
+      return message;
+    }
+  }
+  
+  // 存入消息
+ 	public void put(Message message) {
+    synchronized(list) {
+      while(list.size() == capcity) {
+        try {
+          System.out.println("队列已满，生产者线程等待")
+          list.wait();
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+      // 将消息加入队列尾部
+      list.addLast(message);
+      System.out.println("已生产消息: {}".format(message));
+      list.notifyAll();
+    }
+  }
+}
+
+final class Message {
+  private int id;
+  private Object value;
+  
+  public Message(int id, Object vlaue) {
+    this.id = id;
+    this.value = vlaue;
+  }
+  
+  public int getId() {
+    return id;
+  }
+  
+  public Object getValue() {
+    return value;
+  }
+  
+  @Override
+  public String toString() {
+    return "Message{" +
+      			"id=" + id +
+      			", value" + value +
+      			'}';
+  }
+}
+```
+
