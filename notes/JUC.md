@@ -229,7 +229,7 @@ new Thread(task1, "t3");
 
 // 主线程阻塞，同步等待 task执行完毕的结果
 Integer result = task1.get();
-System.out.println("结果是 {}".format(result));
+log.debug("结果是 {}", result);
 
 // 输出：
 // "hello from thread 3"

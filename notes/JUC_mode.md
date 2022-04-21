@@ -94,7 +94,7 @@ public class Test {
     new Thread(() -> {
       System.out.println("等待结果");
       List<String> list = (List<String>) obj.get();
-      System.out.println("结果大小: {}".format(list.size()));
+      log.debug("结果大小: {}", list.size());
     }, "t1").start();
     
     new Thread(() -> {
@@ -205,9 +205,10 @@ class People extends Thread {
   public void run() {
     // 收信
     GuardedObject obj = Mailboxes.createGuardedObject();
-    System.out.println("开始收信, id: {}".format(obj.getId()));
+    log.debug("开始收信, id: {}", obj.getId());
+
     Object mail = obj.get(5000);
-    System.out.println("收到信, id: {}, 内容: {}".format(obj.getId(), mail));
+    log.debug("收到信, id: {}, 内容: {}", obj.getId(), mail);
   }
 }
 
@@ -224,7 +225,7 @@ class Postman extends Thread {
   public void run() {
     // 收信
     GuardedObject obj = Mailboxes.getGuardedObject(id);
-    System.out.println("送信, id: {}, 内容: {}".format(obj.getId(), mail));
+    log.debug("送信, id: {}, 内容: {}", obj.getId(), mail);
     Object mail = obj.complete(mail);
   }
 }
@@ -365,7 +366,7 @@ class MessageQueue {
       }
       // 从队列头部获取消息并返回
       Message message = list.removeFirst();
-      System.out.println("已消费消息: {}".format(message));
+      log.debug("已消费消息: {}", message);
       list.notifyAll();
       return message;
     }
@@ -384,7 +385,7 @@ class MessageQueue {
       }
       // 将消息加入队列尾部
       list.addLast(message);
-      System.out.println("已生产消息: {}".format(message));
+      log.debug("已生产消息: {}", message);
       list.notifyAll();
     }
   }
