@@ -1385,3 +1385,549 @@ t线程用 synchronized(obj)获取了对象锁后
 当前线程所有代码运行完毕，进入 TERMINATED
 
 ### 3.10 多把锁
+
+```java
+class BigRoom {
+  private final Object studyRoom = new Object();
+  private final Object bedRoom = new Object();
+  
+  public void sleep() {
+    synchronized(bedRoom) {
+      log.debug("sleeping 2 hours");
+      Thread.sleep(2);
+    }
+  }
+  
+  public void study() {
+    synchronized(studyRoom) {
+      log.debug("study 1 hour");
+      Thread.sleep(1);
+    }
+  }
+}
+```
+
+将锁的粒度细分：
+
+- 好处：是可以增强并发度
+- 坏处：如果一个线程需要同时获得多巴索，就容易发生死锁
+
+### 3.11 活跃性
+
+#### 死锁
+
+有这样的情况：一个线程需要同时获取多把锁，这时就容易发生死锁
+
+```java
+Object A = new Object();
+Object B = new Object();
+
+Thread t1 = new Thread(() -> {
+  synchronized(A) {
+    log.debug("lock A");
+    sleep(1);
+    synchronized(B) {
+      log.debug("lock B");
+      log.debug("操作...");
+    }
+  }
+}, "t1");
+
+Thread t2 = new Thread(() -> {
+  synchronized(B) {
+    log.debug("lock B");
+    sleep(1);
+    synchronized(A) {
+      log.debug("lock A");
+      log.debug("操作...");
+    }
+  }
+}, "t2");
+t1.start();
+t2.start();
+```
+
+#### 定位死锁
+
+- 检测死锁可以使用 `jConsole`工具，或者使用 `jps`定位进程 id，再用 `jstack`定位死锁
+- 避免死锁要注意加锁顺序
+- 另外如果由于某个线程进入死循环，导致其它线程一直等待下去，这种情况 linux下可以通过 `top`先定位到 cpu占用高的 java进程，再利用 `top -Hp 进程id`来定位是哪个进程，最后再用 `jstack`排查
+
+#### 哲学家就餐问题
+
+有五位哲学家，围坐在圆桌旁。
+
+- 他们只做两件事，思考和吃饭，思考一会吃口饭，吃完饭后接着思考。
+-  吃饭时要用两根筷子吃，桌上共有 5 根筷子，每位哲学家左右手边各有一根筷子。 
+- 如果筷子被身边的人拿着，自己就得等待
+
+```java
+public class Test {
+	public static void main(String[] args) {
+    Chopstick c1 = new Chopstick("1");
+    Chopstick c2 = new Chopstick("2");
+    Chopstick c3 = new Chopstick("3");
+    Chopstick c4 = new Chopstick("4");
+    Chopstick c5 = new Chopstick("5");
+    
+    new Philosopher("苏格拉底", c1, c2).start();
+    new Philosopher("柏拉图", c2, c3).start();
+    new Philosopher("亚里士多德", c3, c4).start();
+    new Philosopher("赫拉克利特", c4, c5).start();
+    new Philosopher("阿基米德", c5, c1).start();
+  } 
+}
+
+class Chopstick {
+  String name;
+ 	
+  public Chopstick(String name) {
+    this.name = name;
+  }
+  
+  @Override
+  public String toString() {
+    return "筷子{" + name + "}"; 
+  }
+}
+
+class Philosopher extends Thread {
+  Chopstick left;
+  Chopstick right;
+  
+  public Philosopher(String name, Chopstick left, Chopstick right) {
+    super(name);
+    this.left = left;
+    this.right = right;
+  }
+  
+  private void eat() {
+    log.debug("eating...");
+    sleep(1);
+  }
+  
+  @Override
+  public void run() {
+    while(true) {
+      synchronized(left) {
+        synchronized(right) {
+          eat();
+        }
+      }
+    }
+  }
+}
+```
+
+上述代码执行一会儿，就会执行不下去。使用 jconsole可以检测到死锁
+
+#### 活锁
+
+活锁出现在两个线程互相改变对方的结束条件，最后谁都无法结束
+
+```java
+public class Test {
+  static volatile int count = 10;
+  static final Object lock = new Object();
+  
+  public static void main(String[] args) {
+    new Thread(() -> {
+      while(count > 0) {
+        sleep(0.2);
+        count--;
+        log.debug("count:{}", count);
+      }
+    }, "t1").start();
+    
+    new Thread(() -> {
+      while(count < 20) {
+        sleep(0.2);
+        count++;
+        log.debug("count:{}", count);
+      }
+    }, "t2").start();
+  }
+}
+```
+
+#### 饥饿
+
+一个线程由于优先级太低，始终得不到cpu调度执行，也不能够结束。
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/hungry_lock-2022-04-24-b728dd23576457fe25932df0d96ed7ca-626039.png" alt="hungry_lock" style="zoom:50%;" />
+
+顺序加锁的解决方案
+
+<img src="https://zion-bucket1.obs.cn-north-4.myhuaweicloud.com/images/hungry_lock_order-2022-04-24-586b958b5eebe4d7f710c610d26c796d-47ad3c.png" alt="hungry_lock_order" style="zoom:50%;" />
+
+### 3.12 ReetrantLock
+
+相对于 `synchronized`，具备以下特点：
+
+- 可中断
+- 可以设置超时时间
+- 可以设置为公平锁
+- 支持多个条件变量
+
+与 `synchronized`一样，都支持可重入
+
+基本语法
+
+```java
+// 获取锁
+reentrantLock.lock();
+try {
+  // 临界区
+} finally {
+  // 释放锁
+  reentrantLock.unlock();
+}
+```
+
+#### 可重入
+
+可重入是指同一个线程如果首次获得了这把锁，那么因为它是这把锁的拥有者，因此有权利再次获取这把锁
+
+如果是不可重入锁，那么第二次获得锁时，自己也会被锁住
+
+```java
+public class Test {
+  static ReentrantLock lock = new ReentrantLock();
+  
+  public static void main(String[] args) {
+    method1();
+  }
+  
+  public static void method1() {
+    lock.lock();
+    try {
+      log.debug("execute method1");
+      method2();
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public static void method2() {
+    lock.lock();
+    try {
+      log.debug("execute method2");
+      method3();
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public static void method3() {
+    lock.lock();
+    try {
+      log.debug("execute method3");
+    } finally {
+      lock.unlock();
+    }
+  }
+}
+```
+
+#### 可打断
+
+`lock.lockInterruptibly()`
+
+```java
+public class Test {
+  public static void main(String[] args) {
+   	ReentrantLock lock = new ReentrantLock();
+    
+    Thread t1 = new Thread(() -> {
+      log.debug("启动...");
+      try {
+        // 加一把可打断的锁
+        lock.lockInterruptibly();
+        // 如果是不可中断模式，即使使用了 interrupt方法也不会让等待中断
+        // lock.lock();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+        log.debug("等待锁的过程中被打断");
+        return;
+      }
+      
+      try {
+        log.debug("获得了锁");
+      } finally {
+        lock.unlock();
+      }
+    }, "t1");
+    
+    lock.lock();
+    log.debug("获得了锁");
+    t1.start();
+    try {
+      Thread.sleep(1);
+      t1.interrupt(); // 打断 t1线程的运行
+      log.debug("执行打断");
+    } finally {
+      lock.unlock();
+    }
+  }
+}
+```
+
+#### 锁超时
+
+`lock.tryLock()`
+
+##### 立刻失败
+
+```java
+ReentrantLock lock = new ReentrantLock();
+Thread t1 = new Thread(() -> {
+  log.debug("启动...");
+  if (!lock.tryLock()) {
+    log.debug("获取立刻失败，返回");
+  }
+  try {
+    log.debug("获得了锁");
+  } finally {
+    lock.unlock();
+  }
+}, "t1");
+
+lock.lock();
+log.debug("获得了锁");
+t1.start();
+try {
+  sleep(2);
+} finally {
+  lock.unlock();
+}
+```
+
+##### 超时失败
+
+```java
+ReentrantLock lock = new ReentrantLock();
+Thread t1 = new Thread(() -> {
+  log.debug("启动...");
+  if (!lock.tryLock(1, TimeUnit.SECONDS)) {
+    log.debug("获取等待 1s后失败，返回");
+  } catch (InterruptedException e) {
+    e.printStackTrace();
+  }
+  try {
+    log.debug("获得了锁");
+  } finally {
+    lock.unlock();
+  }
+}, "t1");
+
+lock.lock();
+log.debug("获得了锁");
+t1.start();
+try {
+  sleep(2);
+} finally {
+  lock.unlock();
+}
+```
+
+##### 使用 tryLock解决哲学家就餐问题
+
+```java
+class Chopstick extends ReentrantLock {
+  String name;
+  
+  public Chopstick(String name) {
+    this.name = name;
+  }
+  
+  @Override
+  public String toString() {
+    return "筷子{" + name + "}";
+  }
+}
+
+class Philosopher extends Thread {
+  Chopstick left;
+  Chopstick right;
+  
+  public Phiosopher(String name, Chopstick left, Chopstick right) {
+    super(name);
+    this.left = left;
+    this.right = right;
+  }
+  
+  @Override
+  public void run() {
+    while(true) {
+      if (left.tryLock()) {
+        try {
+          if (right.tryLock()) {
+            try {
+              eat();
+            } finally {
+              right.unlock();
+            }
+          }
+        } finally {
+          left.unlock();
+        }
+      }
+    }
+  }
+  
+  private void eat() {
+    log.debug("eating...");
+    sleep(1);
+  }
+}
+```
+
+#### 公平锁
+
+ReentrantLock默认是不公平锁
+
+```java
+ReetrantLock lock = new ReetrantLock(false);
+
+lock.lock();
+for (int i = 0; i < 500; i++) {
+  new Thread(() -> {
+    lock.lock();
+    try {
+      System.out.println(Thread.currentTread().getName() + "running...");
+    } finally {
+      lock.unlock();
+    }
+  }, "t" + i).start();
+}
+
+// 1s后争抢锁
+Thread.sleep(1000);
+new Thread(() -> {
+  System.out.println(Thread.currentThread().getName() + "start...");
+  lock.lock();
+  try {
+    System.out.println(Thread.currentTread().getName() + "running...");
+  } finally {
+    lock.unlock();
+  }
+}, "强行插入").start();
+
+lock.unlock();
+```
+
+强行插入线程，有机会在中间输入。不一定百分百复现
+
+改为公平锁后，强行插入线程，总是在最后输出
+
+```java
+ReentrantLock lock = new ReentrantLock(true);
+```
+
+公平锁一般没有必要，会降低并发度
+
+#### 条件变量
+
+`synchronized`中也有条件变量，就是 WaitSet休息室，当条件不满足时进入 waitSet等待
+
+`ReentrantLock`的条件比 `synchronized`强大之处在于，它是支持多个条件变量的，这就好比：
+
+- `synchornized`是那些不符合条件的线程在一间休息室等消息
+- 而 `ReentrantLock`支持多间休息室，根据需求来调整
+
+使用要点：
+
+- await前需要获得锁
+- await执行后，会释放锁，进入 conditionObject等待
+- await的线程被唤醒（或打断，或超时）去重新竞争 lock锁
+- 竞争 lock锁成功后，从 await后继续执行
+
+```java
+static ReentrantLock lock = new ReentrantLock();
+static Condition waitCigaretteQueue = lock.newCondition();
+static Condiiton waitBreakfastQueue = lock.newCondition();
+static volatile boolean hasCigarette = false;
+static volatile boolean hasBreakfast = false;
+
+public static void main(String[] args) {
+  new Thread(() -> {
+    try {
+      lock.lock();
+      while(!hasCigarette) {
+        try {
+          waitCigaretteQueue.await();
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+      log.debug("等到了烟");
+    } finally {
+      lock.unlock();
+    }
+  }).start();
+  
+  new Thread(() -> {
+    try {
+      lock.lock();
+      while(!hasBreakfast) {
+        try {
+          waitBreakfastQueue.await();
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+      log.debug("等到了早餐");
+    } finally {
+      lock.unlock();
+    }
+  }).start();
+}
+
+private static void sendCigarette() {
+  lock.lock();
+  try {
+    log.debug("送烟来了");
+    hasCigarette = true;
+    waitCigaretteQueue.signal();
+  } finally {
+		lock.unlock();
+  }
+}
+
+private static void sendBreakfast() {
+  lock.lock();
+  try {
+    log.debug("送早餐来了");
+    hasBreakfast = true;
+    waitBreakfastQueue.signal();
+  } finally {
+		lock.unlock();
+  }
+}
+```
+
+#### 本章小结
+
+-  分析多线程访问共享资源时，那些代码片段属于临界区
+- 使用 synchronized互斥解决临界区的线程安全问题
+  - 掌握 synchronized锁对象语法
+  - 掌握 synchronized加载成员方法和静态方法语法
+  - 掌握 wait/notify同步方法
+- 使用 ReentrantLock互斥解决临界区的线程安全问题
+  - 掌握 lock的使用细节：可打断、锁超时、公平锁、条件变量
+- 学会分析变量的线程安全性、掌握常见线程安全类的使用
+- 了解线程活跃性问题：死锁、活锁、饥饿
+- 应用方面
+  - 互斥：使用 synchronized或 ReentrantLock达到共享资源互斥效果
+  - 同步：使用 wait/notify或 ReentrantLock的条件变量达到线程间的通信效果
+- 原理方面
+  - monitor、synchronized、wiat\notify原理
+  - synchronized进阶原理
+  - Park & unpark原理
+- 模式方面
+  - 同步模式之保护性暂停
+  - 同步模式之生产者消费者
+  - 同步模式之顺序控制
+
+
+
